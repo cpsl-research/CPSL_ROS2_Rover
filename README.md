@@ -19,7 +19,7 @@ This repository is a consolidated workspace containing a collection of ROS 2 pac
   * `roverrobotics_gazebo`: Launch and world files for Gazebo simulation.
   * `roverrobotics_input_manager`: Teleoperation nodes mapping joystick inputs to robot movements.
 * **🔧 Key Improvements:**
-  * **Accurate PS4 Rotation:** Tweaked values inside [ps4_controller_config.yaml](file:///home/rover/rover_workspace/src/roverrobotics_ros2/roverrobotics_driver/config/ps4_controller_config.yaml) for precise, predictable rotational steering.
+  * **Accurate PS4 Rotation:** Fixed controller input values inside [ps4_controller_config.yaml](file:///home/rover/rover_workspace/src/roverrobotics_ros2/roverrobotics_driver/config/ps4_controller_config.yaml) to allow the right joystick to control rotation instead of the left trigger.
   * **SSH Teleop Support (`joy_dev` parameter):** The [ps4_controller.launch.py](file:///home/rover/rover_workspace/src/roverrobotics_ros2/roverrobotics_driver/launch/ps4_controller.launch.py) file has been modified to declare and receive a `joy_dev` launch parameter (default: `/dev/input/js0`). This ensures that joystick nodes launch correctly without path errors even when started via an SSH terminal session.
 
 
