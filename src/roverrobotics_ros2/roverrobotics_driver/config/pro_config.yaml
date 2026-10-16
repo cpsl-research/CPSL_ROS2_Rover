@@ -1,4 +1,4 @@
-roverrobotics_driver:
+/**/roverrobotics_driver:
   ros__parameters:
     diagnostics_frequency: 0.2
     odometry_frequency: 15.0
@@ -6,22 +6,25 @@ roverrobotics_driver:
     motor_control_i_gain: 0.7
     motor_control_d_gain: 0.0
     publish_tf: false
-    # robot_status_topic: "/"
+    # Topic names are relative so they follow the launch `namespace` argument
+    # (empty = root, the same names as before). The driver's own defaults for
+    # these are absolute, which would ignore a namespace, so they are set here.
+    robot_status_topic: "robot_status"
     # robot_status_frequency: 60.0
-    # robot_info_request_topic:
-    # robot_info_topic:
+    robot_info_request_topic: "robot_info/request"
+    robot_info_topic: "robot_info"
     robot_type: "pro"
     device_port: "/dev/rover-pro"
     comm_type: "serial"
-    speed_topic: "/cmd_vel"
-    # estop_trigger_topic:
-    # estop_reset_topic:
-    # trim_topic:
+    speed_topic: "cmd_vel"
+    estop_trigger_topic: "soft_estop/trigger"
+    estop_reset_topic: "soft_estop/reset"
+    trim_topic: "trim_event"
     # estop_state:
     control_mode: "OPEN_LOOP" # Open loop = OPEN_LOOP | Closed loop = INDEPENDENT_WHEEL
     # linear_top_speed:
     # angular_top_speed:
-    odom_topic: "/odometry/wheels"
+    odom_topic: "odometry/wheels"
     odom_frame_id: "odom"
     odom_child_frame_id: "base_link" # Set this to the base frame of the robot
     # angular_a_coef:

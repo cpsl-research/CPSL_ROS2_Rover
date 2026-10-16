@@ -2,9 +2,9 @@ from pathlib import Path
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, GroupAction
 from launch.substitutions import LaunchConfiguration
-from launch_ros.actions import Node
+from launch_ros.actions import Node, PushRosNamespace
 
 
 def generate_launch_description():
@@ -25,6 +25,8 @@ def generate_launch_description():
     ld.add_action(DeclareLaunchArgument('start_lin_throttle', default_value='-1.0'))
     ld.add_action(DeclareLaunchArgument('start_ang_throttle', default_value='-1.0'))
     ld.add_action(DeclareLaunchArgument('joy_dev', default_value='/dev/input/js0'))
+    ld.add_action(DeclareLaunchArgument('namespace', default_value='',
+                                        description='ROS namespace (empty = root)'))
 
     node = Node(
         package='roverrobotics_input_manager',
@@ -43,7 +45,6 @@ def generate_launch_description():
         respawn_delay=1
     )
 
-    ld.add_action(node)
     node2 = Node(
         package='joy_linux',
         executable='joy_linux_node',
@@ -52,5 +53,7 @@ def generate_launch_description():
         respawn=True,
         respawn_delay=1
     )
-    ld.add_action(node2)
+    # joy_linux publishes `joy` and joys_manager subscribes to `joy` (relative),
+    # and the cmd_vel topic in topics.yaml is relative, so one namespace moves all.
+    ld.add_action(GroupAction([PushRosNamespace(LaunchConfiguration('namespace')), node, node2]))
     return ld

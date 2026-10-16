@@ -43,7 +43,7 @@ def generate_launch_description():
             executable = 'bno055',
             parameters = [accessories_config_path],
             remappings=[
-                ('/imu', '/imu/data')
+                ('imu', 'imu/data')
             ])
         
         # Add BNO055 IMU to launch description

@@ -20,9 +20,12 @@ def generate_launch_description():
 
     return LaunchDescription([
         DeclareLaunchArgument('joy_dev', default_value='/dev/input/js0', description='Device path for joystick'),
+        DeclareLaunchArgument('namespace', default_value='',
+                              description='ROS namespace for the driver, tf and teleop (empty = root)'),
         SetEnvironmentVariable('RCUTILS_LOGGING_BUFFERED_STREAM', '1'),
         IncludeLaunchDescription(PythonLaunchDescriptionSource(
-            [ThisLaunchFileDir(), '/pro.launch.py'])),
+            [ThisLaunchFileDir(), '/pro.launch.py']),
+            launch_arguments={'namespace': LaunchConfiguration('namespace')}.items()),
         IncludeLaunchDescription(PythonLaunchDescriptionSource(
             [ThisLaunchFileDir(), '/ps4_controller.launch.py']),
             launch_arguments={
@@ -33,5 +36,6 @@ def generate_launch_description():
                 'start_lin_throttle': str(joy_params.get('start_lin_throttle', -1.0)),
                 'start_ang_throttle': str(joy_params.get('start_ang_throttle', -1.0)),
                 'joy_dev': LaunchConfiguration('joy_dev'),
+                'namespace': LaunchConfiguration('namespace'),
             }.items()),
     ])

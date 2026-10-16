@@ -70,7 +70,7 @@ def open_yaml(file_name):
 
 def main(args=None):
     rclpy.init(args=args)
-    mapper = Mapper('/joy')
+    mapper = Mapper('joy')
     rclpy.spin(mapper)
 
 if __name__ == '__main__':

@@ -3,10 +3,10 @@ from pathlib import Path
 from ament_index_python.packages import get_package_share_directory
 from ament_index_python.packages import get_package_share_path
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, GroupAction, IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import Command, LaunchConfiguration
-from launch_ros.actions import Node
+from launch_ros.actions import Node, PushRosNamespace, SetRemap
 from launch_ros.parameter_descriptions import ParameterValue
 
 
@@ -22,6 +22,13 @@ def generate_launch_description():
     hardware_config = Path(get_package_share_directory(
         'roverrobotics_driver'), 'config', 'pro_config.yaml')
     assert hardware_config.is_file()
+
+    # ROS namespace for everything this launch starts. Empty (the default) is
+    # the root namespace, i.e. the driver's behaviour before this argument
+    # existed. pro_config.yaml names its topics relatively, so they follow it.
+    namespace_arg = DeclareLaunchArgument(
+        name='namespace', default_value='',
+        description='ROS namespace for the driver, tf and accessories (empty = root)')
 
     ld = LaunchDescription()
 
@@ -50,10 +57,22 @@ def generate_launch_description():
         parameters=[{'robot_description': robot_description}]
     )
     
+    # tf goes to <ns>/tf and <ns>/tf_static, never the global /tf. The remaps
+    # are a no-op at the root namespace. robot_state_publisher and
+    # joint_state_publisher sit in the group, so /robot_description and
+    # /joint_states are per robot too.
+    group = GroupAction([
+        PushRosNamespace(LaunchConfiguration('namespace')),
+        SetRemap(src='/tf', dst='tf'),
+        SetRemap(src='/tf_static', dst='tf_static'),
+        robot_driver,
+        accessories_launch,
+        joint_state_publisher_node,
+        robot_state_publisher_node,
+    ])
+
     ld.add_action(model_arg)
-    ld.add_action(robot_driver)
-    ld.add_action(accessories_launch)
-    ld.add_action(joint_state_publisher_node)
-    ld.add_action(robot_state_publisher_node)
+    ld.add_action(namespace_arg)
+    ld.add_action(group)
    
     return ld
