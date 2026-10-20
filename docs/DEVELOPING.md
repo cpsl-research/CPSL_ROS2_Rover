@@ -76,7 +76,7 @@ ros2 launch roverrobotics_driver pro_teleop.launch.py namespace:=test   # then, 
 ros2 node list; ros2 topic list     # expect /test/... names
 ```
 
-With no robot the driver logs a fatal "Did not receive any data" and is restarted every
+With no robot the driver logs a fatal "Robot at /dev/rover-pro is not available" and is restarted every
 second; the other nodes still start. That is enough to check names and `tf` remaps. If a
 robot is plugged in at `/dev/rover-pro`, the launch opens it, so unplug it or stop other
 programs using the port first.

@@ -43,7 +43,7 @@ ls -l /dev/rover-pro      # a symlink to /dev/ttyUSB0 or similar
 
 Without any rule, add yourself to `dialout` (`sudo usermod -aG dialout $USER`, then log out
 and in) and set `device_port` in `pro_config.yaml` to the port, such as `/dev/ttyUSB0`.
-"Permission denied" in the driver log means neither is in place.
+If neither is in place the driver logs "Robot at /dev/rover-pro is not available" (table below).
 
 ## 2. Install dependencies
 
@@ -69,9 +69,7 @@ source install/setup.bash
 
 Use a plain build. With `--symlink-install`, `joys_manager.py` is installed as a link to a
 file that is not executable, and the next step stops with
-`executable 'joys_manager.py' not found` (`TODO.md`, first item).
-
-You should see `Summary: 3 packages finished`.
+`executable 'joys_manager.py' not found` (`TODO.md`, first item). You should see `Summary: 3 packages finished`.
 
 ## 4. Drive
 
@@ -112,7 +110,8 @@ ros2 topic echo /cmd_vel  # move a stick
 
 | Message | Meaning |
 |---|---|
-| `Did not receive any data from the robot or the data is stale` (driver, fatal; it restarts every second) | Nothing answered on `/dev/rover-pro`: wrong device, no permission, robot off, or another program holds the port |
+| `Robot at /dev/rover-pro is not available ...` (driver, fatal; restarts every second) | The port could not be opened: no udev rule or no such device, or no permission (section 1) |
+| `Did not receive any data from the robot or the data is stale` (driver, fatal; it restarts every second) | The port opened but the robot sent nothing: robot off, wrong device behind the name, or another program (another driver) holds the port |
 | `Couldn't open joystick /dev/input/js0` | The pad is not connected, or is under another name: use `joy_dev:=` |
 | `IndexError when updating controller states` (`joys_manager`) | The device is not a PS4 pad; the axis numbers do not match |
 | The launch is fine but the robot does not move | There is no enable or deadman button: the sticks alone drive, and within 0.15 of centre counts as zero. Run `ros2 topic echo /cmd_vel` while pushing a stick. Always zero: the pad's axes do not match (test with `jstest /dev/input/js0` from `sudo apt install joystick`). Non-zero but no motion: the driver is not reaching the robot (first row), or check the robot's power switch and e-stop |
