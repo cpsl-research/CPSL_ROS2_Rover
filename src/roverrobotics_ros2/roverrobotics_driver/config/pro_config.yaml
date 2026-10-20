@@ -5,7 +5,9 @@
     motor_control_p_gain: 0.4
     motor_control_i_gain: 0.7
     motor_control_d_gain: 0.0
-    publish_tf: false
+    # Driver publishes odom->base_link on <ns>/tf (the launch remaps /tf -> tf).
+    # Set false if a robot_localization EKF is added (it would own that transform).
+    publish_tf: true
     # Topic names are relative so they follow the launch `namespace` argument
     # (empty = root, the same names as before). The driver's own defaults for
     # these are absolute, which would ignore a namespace, so they are set here.
