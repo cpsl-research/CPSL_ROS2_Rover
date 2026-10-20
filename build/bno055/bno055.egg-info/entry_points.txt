@@ -1,2 +1,0 @@
-[console_scripts]
-bno055 = bno055.bno055:main
