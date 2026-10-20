@@ -1,0 +1,19 @@
+# TODO
+
+Found by console (the lab GUI) while driving a Rover Pro. Each item is written to paste into an issue.
+
+- **`joys_manager.py` is committed as mode 100644, so a symlink install cannot launch it.** At `fcfa735`, `git ls-tree fcfa735 src/roverrobotics_ros2/roverrobotics_input_manager/scripts/joys_manager.py` shows `100644`. `roverrobotics_input_manager/CMakeLists.txt:11-13` installs it with `install(PROGRAMS ...)`. After `colcon build --symlink-install`, `ros2 launch roverrobotics_driver pro_teleop.launch.py` (includes `ps4_controller.launch.py`, which runs it) fails with `executable 'joys_manager.py' not found`; a copy install works. Untested: a symlink install after a `chmod`, so the mode is the likely cause, not proven. Fix: mode 100755 (`git update-index --chmod=+x`).
+- **Rover Pro (firmware 10009, inferred): `BatteryState.current` is always 0.** Under `src/roverrobotics_ros2/roverrobotics_driver/`: `library/librover/src/protocol_pro.cpp:19-26` (`slow_data`) does not poll `BATTERY_CURRENT_A/B`; `protocol_pro.cpp:296-305` stores them only if firmware != `OVF_FIXED_FIRM_VER_` (10009, `protocol_pro.hpp:93`), so on 10009 they are discarded; `src/roverrobotics_ros2_driver.cpp:326` sets `battery_msg.current = robot_data_.battery2_current`, never filled, so `/rover_pro/battery_status` reports 0.0 (line 325 voltage is an estimate, `battery1_SOC / 29.94`). Consumers cannot tell "0 A" from "not measured". Why does the 10009 guard exist? Fix: publish NaN when current is not read; if 10009 can supply current, poll it.
+- **Units of `/robot_status` `motorN_current` and `motorN_temp` are undocumented.** `roverrobotics_ros2_driver.cpp:278-287` publishes motor 1/2 current (indices 2, 7) and temperature (3, 8) from `REG_MOTOR_FB_CURRENT_LEFT/RIGHT` and `REG_MOTOR_TEMP_LEFT/RIGHT` (`protocol_pro.cpp:20-21`) as raw register values. Seen at idle: current 14, temp 102 (unlikely whole degrees C). Document the units or the register map.
+- **Rover Pro wheel odometry reads about half the real distance and angle.** Signs are correct (REP-103; motor1 = left, motor2 = right); only the magnitude is wrong. Measured on the real robot (read-only recording of `/odometry/wheels`, one straight leg then 5 right and 5 left in-place turns), with `tools/odom_calibrate.py` in the console repo (commit 63f547a):
+
+  | Quantity (true / odom) | Run 1 | Run 2 |
+  |---|---|---|
+  | Linear scale | 2.015 (truth 2.489 m, assumed) | 1.941 (truth 2.362 m, tape-measured) |
+  | Angular, right | 1.853 | 2.040 |
+  | Angular, left | 2.079 | 2.063 |
+  | Angular, combined | 1.959 | 2.051 |
+
+  Distance repeats within 1.5% between runs. After the speed scale is fixed the remaining angular factor is 1.057, implying traction 0.59-0.645; the current `odom_traction_factor_` = 0.610 is fine. Proposed fix: scale the rpm to m/s conversion by ~1.94 (`protocol_pro.cpp` ~320-340, `MOTOR_RPM_TO_MPS_RATIO_`); keep traction 0.610; `wheel2wheelDistance` 0.365 needs no change. Fallback if the speed scale cannot change: linear x1.94 and traction ~1.25.
+  HYPOTHESIS (unproven): a common 2x on linear and angular points to the shared rpm to m/s step, not slip. `protocol_pro.cpp` multiplies rpm by 2 only when firmware equals `OVF_FIXED_FIRM_VER_`; if this robot takes the other branch that alone gives 2x. Nobody has checked which branch runs. To confirm: log `robot_firmware` and the branch taken, and compare a raw `motor_rpm` against a hand-counted wheel revolution over a measured distance.
+  Caveats: one tape-measured leg; one surface; 4WD; turn residual judged by eye. Re-run: `uv run python tools/odom_calibrate.py record --out run.jsonl --duration 300` then `analyze run.jsonl --forward-m 2.362 --right-turns 5 --left-turns 5` (console repo).
