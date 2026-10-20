@@ -17,24 +17,23 @@ configs for other models (Max, Mega, Mini, Miti, Zero); the lab does not use or 
 
 Upstream: [RoverRobotics/roverrobotics_ros2](https://github.com/RoverRobotics/roverrobotics_ros2).
 
-**Accessories are not supported in this fork.** `roverrobotics_driver/launch/accessories.launch.py`
-still reads `config/accessories.yaml` and would start `rplidar_ros` or `bno055` if
-their `active` flag were set to `true`. Those packages are no longer here, so leave
-them `false` (the default).
+**Accessories are not supported:** leave every `active` flag in `config/accessories.yaml` `false`.
 
 ## Quick start
 
+Full steps, with the udev rule and the PS4 pad, are in [First drive](docs/tutorials/01_first_drive.md).
+
 ```bash
+git clone https://github.com/cpsl-research/CPSL_ROS2_Rover.git && cd CPSL_ROS2_Rover
 sudo bash scripts/deps/rover.sh                 # apt dependencies (ROS Jazzy already installed)
-colcon build                                    # from the repo root
+source /opt/ros/jazzy/setup.bash
+colcon build                                    # plain build, not --symlink-install
 source install/setup.bash
 ros2 launch roverrobotics_driver pro_teleop.launch.py
 ```
 
-Use plain `colcon build`, not `--symlink-install`; see the first tutorial.
-The Pro must be connected at `/dev/rover-pro`. That device name comes from a udev rule
-that this repo does not install. Rover Robotics' install scripts do:
-[`rover_install_scripts_ros2`](https://github.com/RoverRobotics/rover_install_scripts_ros2).
+The Pro must appear as `/dev/rover-pro`, a name made by a udev rule that this repo does not
+install; the tutorial gives the rule and the command.
 
 ## Tutorials
 
@@ -43,6 +42,6 @@ that this repo does not install. Rover Robotics' install scripts do:
 
 ## Other docs
 
-- [`docs/DEVELOPING.md`](docs/DEVELOPING.md): the lab's changes, rebasing on upstream, install types.
+- [`docs/DEVELOPING.md`](docs/DEVELOPING.md): for developers: the lab's changes and rebasing on upstream.
 - [`TODO.md`](TODO.md): known issues, written to paste into an issue.
 - The lab GUI [console](https://github.com/cpsl-research/console) can build and run this repo; nothing here needs it.

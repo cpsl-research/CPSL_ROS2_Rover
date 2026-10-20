@@ -19,19 +19,12 @@ want the driver without the gamepad.
 
 ## What moves
 
-Every node and topic sits under the namespace, because the launch files use
-`PushRosNamespace` and every topic name in `config/pro_config.yaml` and
-`config/topics.yaml` is relative (no leading `/`). In `ros2 node list` and `ros2 topic list`
-you should see:
+Every node and topic sits under the namespace (for example `/cpsl_ugv_1/cmd_vel`,
+`/cpsl_ugv_1/odometry/wheels`, `/cpsl_ugv_1/joy`). Check with:
 
-| Name | Notes |
-|---|---|
-| `/cpsl_ugv_1/roverrobotics_driver` | the driver (it exits and restarts every second if no robot answers) |
-| `/cpsl_ugv_1/robot_state_publisher`, `joint_state_publisher`, `joy_manager`, `joy_node` | |
-| `/cpsl_ugv_1/cmd_vel` | what the driver listens to (`speed_topic`) |
-| `/cpsl_ugv_1/odometry/wheels`, `robot_status`, `soft_estop/trigger`, `soft_estop/reset` | driver topics |
-| `/cpsl_ugv_1/joy`, `joint_states`, `robot_description` | |
-| `/cpsl_ugv_1/tf`, `/cpsl_ugv_1/tf_static` | see below |
+```bash
+ros2 topic list | grep cpsl_ugv_1
+```
 
 Send a command to a namespaced robot with
 `ros2 topic pub -r 5 /cpsl_ugv_1/cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.2}}"`, and stop
@@ -56,9 +49,7 @@ namespace the remap changes nothing.
 
 To watch the transforms: `ros2 topic echo /cpsl_ugv_1/tf`.
 
-## Two robots on one computer
+## Two robots
 
-Give each launch its own `namespace`. `pro.launch.py` loads one fixed `pro_config.yaml`,
-so both would open the same `device_port`. A second robot on the same computer needs its
-own copy of that config and launch file; this fork does not provide one. The namespace
-keeps topics and tf apart when each robot has its own computer on a shared network.
+Run one robot per computer, each with its own `namespace`, on a shared network. Two on one
+computer would both open the one `device_port` in `pro_config.yaml`.

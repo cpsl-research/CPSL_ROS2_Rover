@@ -1,25 +1,49 @@
 # 1. First drive
 
-Install the dependencies, build the workspace, and drive a Rover Pro with a PS4 gamepad.
-No other repo is needed.
+Install, build, and drive a Rover Pro with a PS4 gamepad. No other repo is needed.
 
 **You need:** a Rover Pro connected to this computer by USB serial, a PS4 pad, Ubuntu 24.04
 with ROS 2 Jazzy ([install guide](https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html)),
-and `colcon` (`sudo apt install python3-colcon-common-extensions`). Put the robot where
-it can move safely, or on blocks, before the first drive.
+and `colcon` (`sudo apt install python3-colcon-common-extensions`). Put the robot on blocks
+or clear floor first.
 
 ## 1. Make `/dev/rover-pro` exist
 
-`device_port` in `config/pro_config.yaml` is `/dev/rover-pro`. This repo does not install
-the udev rule that creates it; Rover Robotics' scripts do. Run `setup_rover.sh` from
-[`rover_install_scripts_ros2`](https://github.com/RoverRobotics/rover_install_scripts_ros2)
-(see its README), then replug the robot and check:
+`device_port` in `config/pro_config.yaml` is `/dev/rover-pro`. A udev rule creates that name
+from the robot's USB serial adapter; this repo does not install it. Pick one:
+
+**A. Copy Rover Robotics' rule file** (the udev step of their `setup_rover.sh`):
+
+```bash
+git clone https://github.com/RoverRobotics/rover_install_scripts_ros2.git
+sudo cp rover_install_scripts_ros2/udev/55-roverrobotics.rules /etc/udev/rules.d/
+sudo udevadm control --reload-rules && sudo udevadm trigger
+```
+
+That file also covers other Rover models and sensors and overwrites FTDI devices with a
+similar signature. Their interactive `./setup_rover.sh` does far more (ROS 2, its own
+`~/rover_workspace`, `~/.bashrc`, boot services); this fork does not need it.
+
+**B. Write only the Pro rule.** The Pro's adapter reports the USB serial string `Rover Pro`
+(vendor `0403` or `10c4`):
+
+```bash
+sudo tee /etc/udev/rules.d/55-roverrobotics.rules <<'RULE'
+KERNEL=="ttyUSB[0-9]", ATTRS{idVendor}=="0403", ATTRS{serial}=="Rover Pro", MODE:="0777", SYMLINK+="rover-pro", RUN+="/bin/setserial /dev/%k low_latency"
+KERNEL=="ttyUSB[0-9]", ATTRS{idVendor}=="10c4", ATTRS{serial}=="Rover Pro", MODE:="0777", SYMLINK+="rover-pro", RUN+="/bin/setserial /dev/%k low_latency"
+RULE
+sudo udevadm control --reload-rules && sudo udevadm trigger
+```
+
+`setserial` (optional apt package) lowers latency. Replug the robot, then check:
 
 ```bash
 ls -l /dev/rover-pro      # a symlink to /dev/ttyUSB0 or similar
 ```
 
-If your robot enumerates under another name, change `device_port` in `pro_config.yaml`.
+Without any rule, add yourself to `dialout` (`sudo usermod -aG dialout $USER`, then log out
+and in) and set `device_port` in `pro_config.yaml` to the port, such as `/dev/ttyUSB0`.
+"Permission denied" in the driver log means neither is in place.
 
 ## 2. Install dependencies
 
@@ -33,7 +57,7 @@ sudo bash scripts/deps/rover.sh
 `diagnostic-updater`, `tf2-geometry-msgs`, `xacro`, `robot-state-publisher`,
 `joint-state-publisher`, `joy` and `joy-linux`. It must run as root, and does nothing for
 packages already installed. It lists them instead of using `rosdep` because the
-`package.xml` files are wrong (the description package asks for `rviz2`; nothing asks for `joy_linux`).
+`package.xml` files are incomplete.
 
 ## 3. Build
 
@@ -45,23 +69,23 @@ source install/setup.bash
 
 Use a plain build. With `--symlink-install`, `joys_manager.py` is installed as a link to a
 file that is not executable, and the next step stops with
-`executable 'joys_manager.py' not found` (see `TODO.md`, first item).
+`executable 'joys_manager.py' not found` (`TODO.md`, first item).
 
-You should see `Summary: 3 packages finished` (the driver prints compiler warnings).
+You should see `Summary: 3 packages finished`.
 
 ## 4. Drive
 
-Connect the pad (by USB, or pair it over Bluetooth) and check that it appears:
+Connect the pad by USB, or pair it over Bluetooth (`bluetoothctl`: hold Share + PS on the
+pad, then `scan on`, `pair`, `trust` and `connect` with its address). Check that it appears:
 
 ```bash
 ls /dev/input/js*         # normally /dev/input/js0
+source /opt/ros/jazzy/setup.bash && source install/setup.bash   # in every new terminal
 ros2 launch roverrobotics_driver pro_teleop.launch.py
 ```
 
-`pro_teleop.launch.py` starts `pro.launch.py` (driver, `robot_state_publisher`,
-`joint_state_publisher`) and `ps4_controller.launch.py` (`joy_linux_node` plus `joys_manager.py`).
-Over SSH, or when the pad is `js1`, name it: `joy_dev:=/dev/input/js1`. The lab added
-that argument so the nodes start from an SSH session.
+The pad must be connected to the computer that runs the launch (the robot's, if you are
+logged in over SSH), not to your laptop. If it is not `js0`, name it: `joy_dev:=/dev/input/js1`.
 
 In the launch output you should see the driver log `Connecting to robot at /dev/rover-pro` and
 `Receiving velocity command from cmd_vel`.
@@ -73,14 +97,14 @@ In the launch output you should see the driver log `Connecting to robot at /dev/
 | D-pad up/down | Change the linear throttle (a multiplier on the stick) by 0.22 per press |
 | D-pad left/right | Change the angular throttle the same way |
 
-The throttles start at 0.66 (linear) and 1.1 (angular), and output is clamped to 1.10 m/s
-and 4.84 rad/s. All of these are in the `joy_manager` block of `pro_config.yaml`.
+Throttles start at 0.66 (linear) and 1.1 (angular); output is clamped to 1.10 m/s and
+4.84 rad/s (`joy_manager` block of `pro_config.yaml`).
 
 ## 5. Check from a second terminal
 
 ```bash
 source /opt/ros/jazzy/setup.bash
-ros2 topic list           # includes /cmd_vel, /joy, /odometry/wheels, /robot_status, /tf
+ros2 topic list           # includes /cmd_vel, /joy, /odometry/wheels, /tf
 ros2 topic echo /cmd_vel  # move a stick
 ```
 
@@ -91,5 +115,6 @@ ros2 topic echo /cmd_vel  # move a stick
 | `Did not receive any data from the robot or the data is stale` (driver, fatal; it restarts every second) | Nothing answered on `/dev/rover-pro`: wrong device, no permission, robot off, or another program holds the port |
 | `Couldn't open joystick /dev/input/js0` | The pad is not connected, or is under another name: use `joy_dev:=` |
 | `IndexError when updating controller states` (`joys_manager`) | The device is not a PS4 pad; the axis numbers do not match |
+| The launch is fine but the robot does not move | There is no enable or deadman button: the sticks alone drive, and within 0.15 of centre counts as zero. Run `ros2 topic echo /cmd_vel` while pushing a stick. Always zero: the pad's axes do not match (test with `jstest /dev/input/js0` from `sudo apt install joystick`). Non-zero but no motion: the driver is not reaching the robot (first row), or check the robot's power switch and e-stop |
 
 Next: [namespace and tf](02_namespace_and_tf.md).
