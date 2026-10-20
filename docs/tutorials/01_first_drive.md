@@ -10,7 +10,7 @@ it can move safely, or on blocks, before the first drive.
 
 ## 1. Make `/dev/rover-pro` exist
 
-`config/pro_config.yaml:19` opens the robot at `/dev/rover-pro`. This repo does not install
+`device_port` in `config/pro_config.yaml` is `/dev/rover-pro`. This repo does not install
 the udev rule that creates it; Rover Robotics' scripts do. Run `setup_rover.sh` from
 [`rover_install_scripts_ros2`](https://github.com/RoverRobotics/rover_install_scripts_ros2)
 (see its README), then replug the robot and check:

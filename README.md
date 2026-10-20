@@ -16,8 +16,6 @@ configs for other models (Max, Mega, Mini, Miti, Zero); the lab does not use or 
 | `roverrobotics_input_manager` | `joys_manager.py`: gamepad `joy` messages to `cmd_vel` |
 
 Upstream: [RoverRobotics/roverrobotics_ros2](https://github.com/RoverRobotics/roverrobotics_ros2).
-The lab removed `bno055`, `rplidar_ros` and the Gazebo package. What the lab changed on
-top of upstream is listed in [`docs/DEVELOPING.md`](docs/DEVELOPING.md).
 
 **Accessories are not supported in this fork.** `roverrobotics_driver/launch/accessories.launch.py`
 still reads `config/accessories.yaml` and would start `rplidar_ros` or `bno055` if

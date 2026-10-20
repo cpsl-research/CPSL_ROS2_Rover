@@ -1,7 +1,7 @@
 # 2. Namespace and tf
 
 Run the driver under a ROS namespace so several robots can share one network, and see where
-the robot's `tf` goes. The lab added this to the upstream driver (commits `69e9303`, `3f4a0c4`).
+the robot's `tf` goes. The lab added this to the upstream driver.
 Start from [First drive](01_first_drive.md).
 
 ## Set a namespace
@@ -62,9 +62,3 @@ Give each launch its own `namespace`. `pro.launch.py` loads one fixed `pro_confi
 so both would open the same `device_port`. A second robot on the same computer needs its
 own copy of that config and launch file; this fork does not provide one. The namespace
 keeps topics and tf apart when each robot has its own computer on a shared network.
-
-## Why the parameter key is `/**/roverrobotics_driver`
-
-A bare node name in a parameters file matches only the root namespace. `/**/` matches the
-node under any namespace, so the same file works for all of them. `joys_manager.py`
-subscribes to `joy` (relative) for the same reason.

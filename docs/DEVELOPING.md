@@ -15,8 +15,8 @@ TODO.md                          known issues, ready to paste into an issue
 
 The snapshot was imported in one commit (`f86b620`) with no upstream history and no
 recorded upstream commit. Everything not listed in the next section is upstream code,
-including the launch files and configs for the Max, Mega, Mini, Miti and Zero, which the
-lab does not use. They were left in place so that diffs against upstream stay small.
+including the launch files and configs for the other models, which stay in place so that
+diffs against upstream stay small.
 
 ## What the lab changed
 
@@ -36,10 +36,9 @@ from the import commit.
 
 The idea is "no absolute names anywhere", so a namespace moves everything. Give any new topic a relative name.
 
-Later lab commits only delete files or add `scripts/deps/`, `TODO.md` and these docs.
-The accessory packages (`bno055`, `rplidar_ros`) and the Gazebo package were deleted, but
-`accessories.launch.py` still names the first two when their `active` flag is `true`. That
-launch file and `config/accessories.yaml` were not edited, so enabling them fails at launch.
+Later lab commits only delete files (the `bno055`, `rplidar_ros` and Gazebo packages) or add
+`scripts/deps/`, `TODO.md` and these docs. `accessories.launch.py` and `config/accessories.yaml`
+were not edited, so enabling an accessory fails at launch (see the README).
 
 ## Rebasing on upstream
 
@@ -48,7 +47,7 @@ branch `jazzy`. On 2026-10-20 its head (`959193a`) differs from this snapshot in
 files beyond the eight above, so there is no shared history to `git rebase` onto.
 
 1. Clone upstream `jazzy` next to this repo and compare the three package folders with
-   `diff -ru`. Expect many differences that are upstream's own.
+   `diff -ru`.
 2. Take the upstream files you want. Then reapply the lab's eight files from the commits
    above: `git show 69e9303 3f4a0c4 f86b620 -- src/roverrobotics_ros2` (`f86b620` also
    imported a `build/` tree; ignore it).
@@ -89,7 +88,7 @@ namespace, so every one the lab uses is set in the file as a relative name.
 
 | Parameter | Before | After |
 |---|---|---|
-| node key | `roverrobotics_driver` (root namespace only) | `/**/roverrobotics_driver` |
+| node key | `roverrobotics_driver` (matches the root namespace only) | `/**/roverrobotics_driver` (matches any namespace; `joys_manager.py` subscribes to relative `joy` for the same reason) |
 | `speed_topic` | `/cmd_vel` | `cmd_vel` |
 | `odom_topic` | `/odometry/wheels` | `odometry/wheels` |
 | `robot_status_topic`, `robot_info_topic`, `robot_info_request_topic` | commented out (absolute default) | `robot_status`, `robot_info`, `robot_info/request` |
