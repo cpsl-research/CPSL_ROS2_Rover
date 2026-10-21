@@ -92,6 +92,17 @@ arguments of the same names; a non-empty one overrides the YAML. Recalibrate wit
 straight leg and counted turns, then edit the YAML or pass the arguments; no rebuild is needed
 with a symlink install, a copy install needs one for the YAML.
 
+## Recalibrating the odometry (`scripts/odom_calibrate.py`)
+
+Read-only, plain rclpy (no console): subscribes to `/<ns>/odometry/wheels` and `/<ns>/robot_status`, writes a jsonl; `analyze` gives linear and angular scale factors.
+```bash
+source /opt/ros/jazzy/setup.bash; export ROS_DOMAIN_ID=0 RMW_IMPLEMENTATION=rmw_fastrtps_cpp   # match the driver
+S=src/roverrobotics_ros2/roverrobotics_driver/scripts/odom_calibrate.py
+python3 $S record --out run.jsonl --duration 300
+python3 $S analyze run.jsonl --forward-m 2.362 --right-turns 5 --left-turns 5
+```
+`ros2 run roverrobotics_driver odom_calibrate ...` is the same after a build is sourced. The jsonl is a `meta` line, then `{t, odom{x,y,yaw,vx,wz,stamp}, rpm[4]}` samples and `{t, marker}` lines. `analyze` imports no ROS. Test: `test/test_odom_calibrate.py` (plain pytest).
+
 ## Appendix: `pro_config.yaml`, before and after `69e9303`
 
 The driver's own default names are absolute (`/cmd_vel`, ...), which would ignore a

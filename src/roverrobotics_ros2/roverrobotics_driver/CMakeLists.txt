@@ -74,6 +74,11 @@ install(TARGETS
   roverrobotics_driver
   DESTINATION lib/${PROJECT_NAME})
 
+install(PROGRAMS
+  scripts/odom_calibrate.py
+  DESTINATION lib/${PROJECT_NAME}
+  RENAME odom_calibrate)
+
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest QUIET)
   if(ament_cmake_gtest_FOUND)
