@@ -22,32 +22,6 @@ def generate_launch_description():
     with open(accessories_config_path, 'r') as f:
         accessories_config = yaml.load(f, Loader=yaml.FullLoader)
 
-    
-    # RP Lidar Setup
-    if accessories_config.get('rplidar', {}).get('ros__parameters', {}).get('active', False):
-        lidar_node = Node(
-            package='rplidar_ros',
-            executable='rplidar_composition',
-            name='rplidar',
-            parameters=[accessories_config_path],
-            output='screen')
-    
-        # Add RPLidar S2 to launch description
-        ld.add_action(lidar_node)
-    
-    # BNO055 IMU Setup
-    if accessories_config.get('bno055', {}).get('ros__parameters', {}).get('active', False):
-        bno055_node = Node(
-            package = 'bno055',
-            name = 'bno055',
-            executable = 'bno055',
-            parameters = [accessories_config_path],
-            remappings=[
-                ('imu', 'imu/data')
-            ])
-        
-        # Add BNO055 IMU to launch description
-        ld.add_action(bno055_node)
 
     # Realsense Node
     if accessories_config.get('realsense', {}).get('ros__parameters', {}).get('active', False):

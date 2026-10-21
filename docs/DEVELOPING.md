@@ -5,7 +5,7 @@ For someone changing this fork. To install and drive, start at the [first tutori
 ## Layout
 
 ```
-scripts/deps/rover.sh            apt dependencies (+ _common.sh, the shared helpers)
+scripts/deps/rover.sh            apt dependencies; `--check` reports them without root (+ _common.sh)
 src/roverrobotics_ros2/          vendored upstream packages (below)
   roverrobotics_driver/          C++ driver (src/, include/, library/librover), launch/, config/
   roverrobotics_description/     URDF, meshes, rviz
@@ -30,15 +30,14 @@ from the import commit.
 | `launch/ps4_controller.launch.py` | `namespace` argument and group; `joy_dev` argument for `joy_linux_node` | `69e9303`, `f86b620` |
 | `config/pro_config.yaml` | Parameter key `/**/roverrobotics_driver`; relative topic names; `publish_tf: true` | `69e9303`, `3f4a0c4` |
 | `config/topics.yaml` | `cmd_vel` made relative | `69e9303` |
-| `launch/accessories.launch.py` | the `bno055` remap made relative (`imu` to `imu/data`) | `69e9303` |
 | `../roverrobotics_input_manager/scripts/joys_manager.py` | subscribes to `joy`, not `/joy` | `69e9303` |
 | `config/ps4_controller_config.yaml` | right stick rotates, not the left trigger; several axis indices changed (each marked in the file) | `f86b620` |
 
 The idea is "no absolute names anywhere", so a namespace moves everything. Give any new topic a relative name.
 
-Later lab commits only delete files (the `bno055`, `rplidar_ros` and Gazebo packages) or add
-`scripts/deps/`, `TODO.md` and these docs. `accessories.launch.py` and `config/accessories.yaml`
-were not edited, so enabling an accessory fails at launch (see the README).
+Later lab commits delete files (the `bno055`, `rplidar_ros` and Gazebo packages), strip the
+`rplidar` and `bno055` entries from `config/accessories.yaml` and `launch/accessories.launch.py`
+(only `realsense` remains), or add `scripts/deps/`, `TODO.md` and these docs.
 
 ## Rebasing on upstream
 

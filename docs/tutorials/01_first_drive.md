@@ -56,7 +56,8 @@ sudo bash scripts/deps/rover.sh
 `scripts/deps/rover.sh` installs, with apt: `libeigen3-dev` and the Jazzy packages
 `diagnostic-updater`, `tf2-geometry-msgs`, `xacro`, `robot-state-publisher`,
 `joint-state-publisher`, `joy` and `joy-linux`. It must run as root, and does nothing for
-packages already installed. It lists them instead of using `rosdep` because the
+packages already installed. `bash scripts/deps/rover.sh --check` (no root, installs nothing)
+exits 0 if they are all installed, else 1 and names the missing ones. It lists them instead of using `rosdep` because the
 `package.xml` files are incomplete.
 
 ## 3. Build
