@@ -159,9 +159,34 @@ RobotDriver::RobotDriver() : Node("roverrobotics", rclcpp::NodeOptions().use_int
   // initialize connection to robot
   RCLCPP_INFO(get_logger(), "Connecting to robot at %s", device_port_.c_str());
   if (robot_type_ == "pro") {
+    // Wheel-odometry calibration; an unset or invalid value keeps its default.
+    ProOdomParams odom_params;
+    auto read_odom_param = [this](const char *name, double def, double lo,
+                                  double hi) {
+      double v = declare_parameter(name, def);
+      if (!std::isfinite(v) || v < lo || v > hi) {
+        RCLCPP_ERROR(get_logger(),
+                     "Parameter %s = %g is outside [%g, %g]; using default %g",
+                     name, v, lo, hi, def);
+        return def;
+      }
+      return v;
+    };
+    odom_params.linear_scale =
+        read_odom_param("odom_linear_scale", odom_params.linear_scale, 0.25, 4.0);
+    odom_params.traction_factor = read_odom_param(
+        "odom_traction_factor", odom_params.traction_factor, 0.1, 2.0);
+    odom_params.wheel_separation = read_odom_param(
+        "odom_wheel_separation", odom_params.wheel_separation, 0.1, 1.0);
+    RCLCPP_INFO(get_logger(),
+                "Pro odometry: linear_scale %.4f, traction_factor %.4f, "
+                "wheel_separation %.4f m",
+                odom_params.linear_scale, odom_params.traction_factor,
+                odom_params.wheel_separation);
     try {
       robot_ = std::make_unique<ProProtocolObject>(
-          device_port_.c_str(), comm_type_, control_mode_, pid_gains_);
+          device_port_.c_str(), comm_type_, control_mode_, pid_gains_,
+          odom_params);
     } catch (int i) {
       RCLCPP_FATAL(get_logger(), "Error when connecting to robot.");
       if (i == SOCKET_CREATION_ERROR) {

@@ -74,4 +74,13 @@ install(TARGETS
   roverrobotics_driver
   DESTINATION lib/${PROJECT_NAME})
 
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest QUIET)
+  if(ament_cmake_gtest_FOUND)
+    ament_add_gtest(test_pro_odometry test/test_pro_odometry.cpp)
+    target_include_directories(test_pro_odometry PRIVATE
+      ${CMAKE_CURRENT_SOURCE_DIR}/library/librover/include)
+  endif()
+endif()
+
 ament_package()

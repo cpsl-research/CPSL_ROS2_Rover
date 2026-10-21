@@ -29,6 +29,11 @@
     odom_topic: "odometry/wheels"
     odom_frame_id: "odom"
     odom_child_frame_id: "base_link" # Set this to the base frame of the robot
+    # Wheel odometry: linear and angular velocity = rpm-derived value x odom_linear_scale;
+    # angular also x odom_traction_factor / odom_wheel_separation. Recalibrate with a measured straight leg and counted turns.
+    odom_linear_scale: 1.94
+    odom_traction_factor: 0.645
+    odom_wheel_separation: 0.365
     # angular_a_coef:
     # angular_b_coef:
     # angular_c_coef:

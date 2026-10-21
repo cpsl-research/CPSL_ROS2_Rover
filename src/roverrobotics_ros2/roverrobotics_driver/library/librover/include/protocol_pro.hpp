@@ -1,5 +1,6 @@
 #pragma once
 
+#include "pro_odometry.hpp"
 #include "protocol_base.hpp"
 
 namespace RoverRobotics {
@@ -10,7 +11,8 @@ class RoverRobotics::ProProtocolObject
  public:
   ProProtocolObject(const char* device, std::string new_comm_type,
                     Control::robot_motion_mode_t robot_mode,
-                    Control::pid_gains pid);
+                    Control::pid_gains pid,
+                    ProOdomParams odom_params = ProOdomParams());
   /*
    * @brief Trim Robot Velocity
    * Modify robot velocity differential (between the left side/right side) with
@@ -96,8 +98,9 @@ class RoverRobotics::ProProtocolObject
   const int termios_baud_code_ = 4097;  // THIS = baudrate of 57600
   const int RECEIVE_MSG_LEN_ = 5;
   const double wheel2wheelDistance = 0.365; // center distance between the wheels
-  const double odom_angular_coef_ = 1/wheel2wheelDistance;
-  const double odom_traction_factor_ = 0.610; // Default for 2WD is 0.9877, 4WD is 0.610, flipper is 0.98
+  // Odometry constants (see pro_odometry.hpp). Default traction for 2WD is
+  // 0.9877, 4WD is 0.610, flipper is 0.98.
+  ProOdomParams odom_params_;
   const double CONTROL_LOOP_TIMEOUT_MS_ = 200;
   std::unique_ptr<CommBase> comm_base_;
   std::string comm_type_;

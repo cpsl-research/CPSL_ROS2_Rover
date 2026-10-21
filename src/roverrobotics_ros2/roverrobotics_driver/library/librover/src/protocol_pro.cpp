@@ -5,7 +5,9 @@ namespace RoverRobotics {
 ProProtocolObject::ProProtocolObject(const char *device,
                                      std::string new_comm_type,
                                      Control::robot_motion_mode_t robot_mode,
-                                     Control::pid_gains pid) {
+                                     Control::pid_gains pid,
+                                     ProOdomParams odom_params) {
+  odom_params_ = odom_params;
   comm_type_ = new_comm_type;
   robot_mode_ = robot_mode;
   robotstatus_ = {0};
@@ -323,24 +325,12 @@ void ProProtocolObject::unpack_comm_response(std::vector<uint8_t> robotmsg) {
       robotstatus_.motor4_mos_temp = 0;
       robotstatus_.robot_guid = 0;
       robotstatus_.robot_speed_limit = 0;
-      if (robotstatus_.robot_firmware == OVF_FIXED_FIRM_VER_) {  // check firmware version
-        robotstatus_.linear_vel =
-            0.5 * (robotstatus_.motor1_rpm * 2 / MOTOR_RPM_TO_MPS_RATIO_ +
-                   robotstatus_.motor2_rpm * 2 / MOTOR_RPM_TO_MPS_RATIO_);
-
-        robotstatus_.angular_vel =
-            ((robotstatus_.motor2_rpm * 2 / MOTOR_RPM_TO_MPS_RATIO_) -
-             (robotstatus_.motor1_rpm * 2 / MOTOR_RPM_TO_MPS_RATIO_)) *
-            odom_angular_coef_ * odom_traction_factor_;
-      } else {
-        robotstatus_.linear_vel =
-            0.5 * (robotstatus_.motor1_rpm / MOTOR_RPM_TO_MPS_RATIO_ +
-                   robotstatus_.motor2_rpm / MOTOR_RPM_TO_MPS_RATIO_);
-
-        robotstatus_.angular_vel =
-            ((robotstatus_.motor2_rpm / MOTOR_RPM_TO_MPS_RATIO_) -
-             (robotstatus_.motor1_rpm / MOTOR_RPM_TO_MPS_RATIO_)) *
-            odom_angular_coef_ * odom_traction_factor_;
+      {
+        ProOdometry odom = pro_odometry(
+            robotstatus_.motor1_rpm, robotstatus_.motor2_rpm,
+            robotstatus_.robot_firmware, MOTOR_RPM_TO_MPS_RATIO_, odom_params_);
+        robotstatus_.linear_vel = odom.linear;
+        robotstatus_.angular_vel = odom.angular;
       }
 
       std::vector<uint32_t> temp;

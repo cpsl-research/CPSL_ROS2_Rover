@@ -65,7 +65,8 @@ A copy install also means every edit to a launch file or config needs a rebuild.
 
 ## Checking a change without a robot
 
-There are no tests for the lab's changes. These run on any machine with ROS installed:
+There is one unit test (`test/test_pro_odometry.cpp`, run by `colcon test`); the rest has none.
+These run on any machine with ROS installed:
 
 ```bash
 for f in scripts/deps/*.sh; do bash -n "$f"; done
@@ -79,6 +80,17 @@ With no robot the driver logs a fatal "Robot at /dev/rover-pro is not available"
 second; the other nodes still start. That is enough to check names and `tf` remaps. If a
 robot is plugged in at `/dev/rover-pro`, the launch opens it, so unplug it or stop other
 programs using the port first.
+
+## Pro wheel odometry calibration
+
+The Pro's wheel odometry is three driver parameters in `config/pro_config.yaml`: `odom_linear_scale`
+(multiplies linear and angular velocity; range 0.25 to 4.0), `odom_traction_factor` (angular; 0.1 to 2.0)
+and `odom_wheel_separation` (m; 0.1 to 1.0). Without them the driver uses 1.0, 0.610 and 0.365, the
+original constants; an out-of-range value is logged as an error and that one keeps its default. The
+driver logs the effective values on start. `pro.launch.py` and `pro_teleop.launch.py` take optional
+arguments of the same names; a non-empty one overrides the YAML. Recalibrate with a measured
+straight leg and counted turns, then edit the YAML or pass the arguments; no rebuild is needed
+with a symlink install, a copy install needs one for the YAML.
 
 ## Appendix: `pro_config.yaml`, before and after `69e9303`
 

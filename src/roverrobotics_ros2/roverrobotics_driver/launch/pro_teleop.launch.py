@@ -22,10 +22,21 @@ def generate_launch_description():
         DeclareLaunchArgument('joy_dev', default_value='/dev/input/js0', description='Device path for joystick'),
         DeclareLaunchArgument('namespace', default_value='',
                               description='ROS namespace for the driver, tf and teleop (empty = root)'),
+        DeclareLaunchArgument('odom_linear_scale', default_value='',
+                              description='Wheel odometry speed scale (empty = pro_config.yaml)'),
+        DeclareLaunchArgument('odom_traction_factor', default_value='',
+                              description='Wheel odometry angular traction factor (empty = pro_config.yaml)'),
+        DeclareLaunchArgument('odom_wheel_separation', default_value='',
+                              description='Wheel odometry wheel separation in m (empty = pro_config.yaml)'),
         SetEnvironmentVariable('RCUTILS_LOGGING_BUFFERED_STREAM', '1'),
         IncludeLaunchDescription(PythonLaunchDescriptionSource(
             [ThisLaunchFileDir(), '/pro.launch.py']),
-            launch_arguments={'namespace': LaunchConfiguration('namespace')}.items()),
+            launch_arguments={
+                'namespace': LaunchConfiguration('namespace'),
+                'odom_linear_scale': LaunchConfiguration('odom_linear_scale'),
+                'odom_traction_factor': LaunchConfiguration('odom_traction_factor'),
+                'odom_wheel_separation': LaunchConfiguration('odom_wheel_separation'),
+            }.items()),
         IncludeLaunchDescription(PythonLaunchDescriptionSource(
             [ThisLaunchFileDir(), '/ps4_controller.launch.py']),
             launch_arguments={
