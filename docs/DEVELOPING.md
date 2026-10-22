@@ -101,7 +101,9 @@ S=src/roverrobotics_ros2/roverrobotics_driver/scripts/odom_calibrate.py
 python3 $S record --out run.jsonl --duration 300
 python3 $S analyze run.jsonl --forward-m 2.362 --right-turns 5 --left-turns 5
 ```
-`ros2 run roverrobotics_driver odom_calibrate ...` is the same after a build is sourced. The jsonl is a `meta` line, then `{t, odom{x,y,yaw,vx,wz,stamp}, rpm[4]}` samples and `{t, marker}` lines. `analyze` imports no ROS. Test: `test/test_odom_calibrate.py` (plain pytest).
+`ros2 run roverrobotics_driver odom_calibrate ...` is the same after a build is sourced. The jsonl is a `meta` line, then `{t, odom{x,y,yaw,vx,wz,stamp}, rpm[4]}` samples and `{t, marker}` lines. `analyze` imports no ROS.
+Optional: `record --progress` prints a `{"progress": {"t", "samples"}}` line each second; `analyze --current-linear-scale S --current-traction T` (the values the driver logged at start) adds `suggested` (`s' = s*L`, `t' = t*A/L`; L the linear scale, A the combined turn scale); an empty `--namespace` means root topics.
+Test: `test/test_odom_calibrate.py` (plain pytest).
 
 ## Appendix: `pro_config.yaml`, before and after `69e9303`
 

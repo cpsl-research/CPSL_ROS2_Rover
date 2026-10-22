@@ -14,9 +14,13 @@ publishes nothing. No console and no custom message package is needed.
            Markers: press Enter in the terminal (if stdin is a tty) to log a
            marker; independent of that, analyze auto-segments on rest periods.
            Stop early with Ctrl-C / SIGINT (file is flushed per line).
+           --progress prints {"progress": {"t": s, "samples": n}} once a second.
+           An empty --namespace means the root topics (/odometry/wheels).
   analyze  python3 odom_calibrate.py analyze run.jsonl \
                --forward-m 2.362 --right-turns 5 --left-turns 5
            [--residual-deg D (floor-mark angle left over, CCW +)]
+           [--current-linear-scale S --current-traction T]  the values the driver ran with;
+           with both, the result gains "suggested" (new odom_linear_scale / odom_traction_factor).
            Imports no ROS; runs anywhere.
 
 Yaw is unwrapped here from the reported angle; wrapped input is fine.
@@ -90,7 +94,8 @@ def per_turn(samples, seg):
     return times
 
 
-def analyze(samples, fwd_m, n_r, n_l, residual_deg=None, segs=None):
+def analyze(samples, fwd_m, n_r, n_l, residual_deg=None, segs=None,
+            current_linear_scale=None, current_traction=None):
     segs = segs if segs is not None else segment(samples)
     sg = analyze_segments(samples, segs)
     out = {"segments": sg, "ground_truth": dict(forward_m=fwd_m, right=n_r, left=n_l,
@@ -126,10 +131,25 @@ def analyze(samples, fwd_m, n_r, n_l, residual_deg=None, segs=None):
                                suggested_traction=TRACTION_NOW * true / tot,
                                asymmetry_L_over_R=out["left"]["integrated_rad"] /
                                out["right"]["integrated_rad"])
+    sug = suggested(out.get("linear"), out.get("combined"), current_linear_scale, current_traction)
+    if sug:
+        out["suggested"] = sug
     if samples:
         yaw = unwrap([s["yaw"] for s in samples])
         out["net_integrated_yaw_deg"] = math.degrees(yaw[-1] - yaw[0])
     return out
+
+
+def suggested(linear, combined, s, t):
+    """New driver parameters from the measured scales. Model: linear = s*0.5(v1+v2),
+    angular = s*(v2-v1)/sep*t. With L = true/integrated distance and A = true/integrated
+    angle: s' = s*L, t' = t*A/L (separation is physical, unchanged). None if anything is missing."""
+    if s is None or t is None or not linear or not combined:
+        return None
+    L, A = linear.get("scale"), combined.get("scale")
+    if not L or not A:
+        return None
+    return dict(odom_linear_scale=s * L, odom_traction_factor=t * A / L)
 
 
 def load(path):
@@ -151,8 +171,17 @@ def load(path):
 RPM_IDX = (1, 6, 11, 16)  # robot_status: motor blocks of five, rpm first after the id
 
 
+def topic(namespace, name):
+    ns = namespace.strip("/")
+    return f"/{ns}/{name}" if ns else f"/{name}"
+
+
+def progress_line(t, n):
+    return json.dumps(dict(progress=dict(t=round(t, 1), samples=n)))
+
+
 def meta_line(namespace, rate, start_wall):
-    topics = dict(odom=f"/{namespace}/odometry/wheels", status=f"/{namespace}/robot_status")
+    topics = dict(odom=topic(namespace, "odometry/wheels"), status=topic(namespace, "robot_status"))
     return json.dumps(dict(meta=dict(namespace=namespace, topics=topics,
                                      start_wall=start_wall, rate=rate)))
 
@@ -196,14 +225,14 @@ def record(a):
     def on_status(m):
         latest["rpm"] = rpm_from_status(m.data)
 
-    node.create_subscription(Odometry, f"/{ns}/odometry/wheels", on_odom, qos_profile_sensor_data)
-    node.create_subscription(Float32MultiArray, f"/{ns}/robot_status", on_status,
+    node.create_subscription(Odometry, topic(ns, "odometry/wheels"), on_odom, qos_profile_sensor_data)
+    node.create_subscription(Float32MultiArray, topic(ns, "robot_status"), on_status,
                              qos_profile_sensor_data)
     f = open(a.out, "w", buffering=1)
     t0 = time.time()
     f.write(meta_line(ns, a.rate, t0) + "\n")
     tty = sys.stdin.isatty()
-    last_stamp, last_write, n, mk = None, -1e9, 0, 0
+    last_stamp, last_write, n, mk, last_prog = None, -1e9, 0, 0, 0.0
     while not stop and time.time() - t0 < a.duration:
         rclpy.spin_once(node, timeout_sec=0.02)
         t = time.time() - t0
@@ -212,6 +241,9 @@ def record(a):
             last_stamp, last_write = o["stamp"], t
             f.write(sample_line(t, o, latest["rpm"]) + "\n")
             n += 1
+        if a.progress and t - last_prog >= 1.0:
+            last_prog = t
+            print(progress_line(t, n), flush=True)
         if tty and select.select([sys.stdin], [], [], 0)[0]:
             sys.stdin.readline()
             mk += 1
@@ -222,7 +254,7 @@ def record(a):
     rclpy.shutdown()
     print(f"recorded {n} samples, {time.time() - t0:.1f}s -> {a.out}")
     if n == 0:
-        print(f"no odometry received on /{ns}/odometry/wheels: check the driver is running "
+        print(f"no odometry received on {topic(ns, "odometry/wheels")}: check the driver is running "
               "and ROS_DOMAIN_ID / RMW_IMPLEMENTATION match", file=sys.stderr)
 
 
@@ -230,7 +262,7 @@ def report(r):
     for i, s in enumerate(r["segments"]):
         print(f"seg{i} {s['kind']:6} t={s['t0']:.1f}-{s['t1']:.1f}s path={s['path']:.3f}m "
               f"dyaw={math.degrees(s['dyaw']):.1f}deg")
-    for k in ("linear", "right", "left", "combined"):
+    for k in ("linear", "right", "left", "combined", "suggested"):
         if r.get(k):
             print(k, {a: (round(b, 4) if isinstance(b, float) else b) for a, b in r[k].items()})
     if "net_integrated_yaw_deg" in r:
@@ -246,6 +278,8 @@ def main(argv=None):
     rc.add_argument("--duration", type=float, default=300)
     rc.add_argument("--rate", type=float, default=10)
     rc.add_argument("--namespace", default="cpsl_rover_1")
+    rc.add_argument("--progress", action="store_true",
+                    help="print a progress JSON line to stdout once a second")
     an = sp.add_parser("analyze")
     an.add_argument("file")
     an.add_argument("--forward-ft", type=float, default=0)
@@ -254,13 +288,16 @@ def main(argv=None):
     an.add_argument("--right-turns", type=float, default=0)
     an.add_argument("--left-turns", type=float, default=0)
     an.add_argument("--residual-deg", type=float, default=None)
+    an.add_argument("--current-linear-scale", type=float, default=None)
+    an.add_argument("--current-traction", type=float, default=None)
     an.add_argument("--json", action="store_true")
     a = p.parse_args(argv)
     if a.cmd == "record":
         return record(a)
     fwd = a.forward_m if a.forward_m is not None else (a.forward_ft * 12 + a.forward_in) * 0.0254
     samples, _ = load(a.file)
-    r = analyze(samples, fwd, a.right_turns, a.left_turns, a.residual_deg)
+    r = analyze(samples, fwd, a.right_turns, a.left_turns, a.residual_deg,
+                current_linear_scale=a.current_linear_scale, current_traction=a.current_traction)
     print(json.dumps(r, indent=1) if a.json else "", end="")
     if not a.json:
         report(r)
