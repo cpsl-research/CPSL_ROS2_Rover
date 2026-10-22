@@ -119,7 +119,7 @@ def test_empty_namespace_is_root():
     assert m["topics"] == {"odom": "/odometry/wheels", "status": "/robot_status"}
 
 
-def test_suggested_formula_docs32_numbers():
+def test_suggested_formula_known_numbers():
     sug = oc.suggested(dict(scale=1.941), dict(scale=2.051), 1.0, 0.610)
     assert abs(sug["odom_linear_scale"] - 1.941) < 1e-9
     assert abs(sug["odom_traction_factor"] - 0.610 * 2.051 / 1.941) < 1e-9
@@ -129,7 +129,7 @@ def test_suggested_formula_docs32_numbers():
 
 
 def test_suggested_synthetic_wheels_recover_truth():
-    """Apply s', t' to the docs-32 model: the true distance and angle come out."""
+    """Apply s', t' to the driver's odometry model: the true distance and angle come out."""
     s, t = 1.0, 0.610
     S = synth()
     r = oc.analyze(S, 2.489, 5, 5, current_linear_scale=s, current_traction=t)
