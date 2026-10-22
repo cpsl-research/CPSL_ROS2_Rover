@@ -61,7 +61,34 @@ def segment(samples, v_thr=0.02, w_thr=0.05, rest_s=2.0, min_s=0.5):
             start = None
     if start is not None:
         segs.append((start, last_mov))
-    return [(a, b) for a, b in segs if samples[b]["t"] - samples[a]["t"] >= min_s]
+    out = []
+    for a, b in segs:
+        out += split_on_reversal(samples, a, b, v_thr, w_thr)
+    return [(a, b) for a, b in out if samples[b]["t"] - samples[a]["t"] >= min_s]
+
+
+def split_on_reversal(samples, a, b, v_thr=0.02, w_thr=0.05, hold_s=1.0):
+    """Split [a, b] where the turn direction reverses without a long rest (a short pause
+    between the right and the left turns). A reversal counts once wz stays above w_thr with
+    the opposite sign for >= hold_s with no sample of the old direction in between. Only in-place rotation counts (|vx| <= v_thr): a drive
+    leg's small yaw wobble never splits. The
+    old part ends at its last sample of the old direction, the new one starts at the first
+    opposite sample. Returns a list of (i0, i1)."""
+    cur, cur_last, cand, parts, start = 0, None, None, [], a
+    for i in range(a, b + 1):
+        w = samples[i]["wz"]
+        sg = 0 if abs(w) <= w_thr or abs(samples[i]["vx"]) > v_thr else (1 if w > 0 else -1)
+        if sg == 0:
+            continue
+        if cur == 0 or sg == cur:
+            cur, cur_last, cand = sg, i, None
+        elif cand is None:
+            cand = i
+        if cand is not None and samples[i]["t"] - samples[cand]["t"] >= hold_s:
+            parts.append((start, cur_last))
+            start, cur, cur_last, cand = cand, sg, i, None
+    parts.append((start, b))
+    return parts
 
 
 def analyze_segments(samples, segs):

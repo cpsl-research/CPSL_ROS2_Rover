@@ -158,3 +158,40 @@ def test_output_unchanged_without_new_flags(tmp_path):
                           "--current-linear-scale", "1.94", "--current-traction", "0.645"],
                          capture_output=True, text=True, check=True).stdout
     assert set(json.loads(out)["suggested"]) == {"odom_linear_scale", "odom_traction_factor"}
+
+
+def _two_turns(first, gap, dt=0.1):
+    """Rest, 2 m forward, rest, 5 turns one way (0.9x true), `gap` s pause, 5 the other (1.1x)."""
+    S, t, x, y, yaw = [], 0.0, 0.0, 0.0, 0.0
+
+    def add(vx, wz, dur):
+        nonlocal t, x, y, yaw
+        for _ in range(int(round(dur / dt))):
+            x += vx * dt * math.cos(yaw); y += vx * dt * math.sin(yaw); yaw += wz * dt; t += dt
+            S.append(dict(t=t, x=x, y=y, yaw=wrap(yaw), vx=vx, wz=wz))
+    add(0, 0, 3); add(0.25, 0, 8); add(0, 0, 3)
+    add(0, first * 0.8, 5 * 2 * math.pi * 0.9 / 0.8); add(0, 0, gap)
+    add(0, -first * 0.8, 5 * 2 * math.pi * 1.1 / 0.8); add(0, 0, 3)
+    return S
+
+
+def test_short_pause_between_opposite_turns_splits():
+    for first in (1, -1):                      # left first, then right first
+        S = _two_turns(first, 1.5)
+        segs = oc.segment(S)
+        assert len(segs) == 3, first
+        r = oc.analyze(S, 2.489, 5, 5, segs=segs)
+        assert [s["kind"] for s in r["segments"]] == ["linear", "turn", "turn"]
+        mine, other = ("left", "right") if first > 0 else ("right", "left")
+        assert abs(r[mine]["integrated_turns"] - 4.5) < 0.05
+        assert abs(r[other]["integrated_turns"] - 5.5) < 0.05
+        assert abs(r["combined"]["scale"] - 1.0) < 0.01
+
+
+def test_drive_wobble_does_not_split_a_leg():
+    S = synth()
+    for s in S:
+        if s["vx"] > 0:
+            s["wz"] = 0.08 if s["t"] < 7.0 else -0.08   # >= 1 s each way while driving
+    assert [k["kind"] for k in oc.analyze_segments(S, oc.segment(S))][0] == "linear"
+    assert len(oc.segment(S)) == 3
