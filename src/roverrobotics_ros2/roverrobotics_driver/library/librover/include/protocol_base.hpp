@@ -11,6 +11,13 @@ class BaseProtocolObject;
 class RoverRobotics::BaseProtocolObject {
  public:
   /*
+   * @brief Virtual so that deleting through std::unique_ptr<BaseProtocolObject>
+   * (as RobotDriver does) runs the derived destructor, which stops and joins
+   * the protocol's threads. Without it only this base destructor ran: the
+   * object's memory was freed while its threads kept running on it.
+   */
+  virtual ~BaseProtocolObject() = default;
+  /*
    * @brief Trim Robot Velocity
    * Modify robot velocity differential (between the left side/right side) with
    * the input parameter. Useful to compensate if the robot tends to drift

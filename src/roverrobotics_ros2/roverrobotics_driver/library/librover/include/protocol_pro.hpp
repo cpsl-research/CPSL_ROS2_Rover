@@ -14,6 +14,13 @@ class RoverRobotics::ProProtocolObject
                     Control::pid_gains pid,
                     ProOdomParams odom_params = ProOdomParams());
   /*
+   * @brief Shutdown in dependency order: stop and join the command threads,
+   * send one motors-neutral frame, then destroy the serial link (which joins
+   * its read thread, the only caller of unpack_comm_response) while every
+   * member those threads touch is still alive.
+   */
+  ~ProProtocolObject() override;
+  /*
    * @brief Trim Robot Velocity
    * Modify robot velocity differential (between the left side/right side) with
    * the input parameter. Useful to compensate if the robot tends to drift
@@ -86,6 +93,11 @@ class RoverRobotics::ProProtocolObject
    * @param sleeptime sleep time between each cycle
    */
   void motors_control_loop(int sleeptime);
+  /*
+   * @brief Build one command frame: the current motors_speeds_ plus a request
+   * for register `reg`. Caller must hold robotstatus_mutex_.
+   */
+  std::vector<unsigned char> motor_frame(int reg);
   const float MOTOR_GEAR_RATIO_ = 1.0 / 192.0; // Gear ratio from motor to wheel shaft including motor poles for converting from ERPM -> RPM
   const float MOTOR_DIST_PER_ROT_ = 0.8179; // 0.8179 Meters per rotation of wheel (wheel diameter of 10.25 inches / 0.26035 m)
   const float MOTOR_RPM_TO_MPS_RATIO_ = 1 / (MOTOR_GEAR_RATIO_ * MOTOR_DIST_PER_ROT_ / 60.0); // Divided by 60 to convert from minutes to seconds. 
@@ -112,6 +124,7 @@ class RoverRobotics::ProProtocolObject
   std::thread fast_data_write_thread_;
   std::thread slow_data_write_thread_;
   std::thread motor_commands_update_thread_;
+  StopSignal stop_;
   bool estop_;
   bool closed_loop_;
   // Motor PID variables

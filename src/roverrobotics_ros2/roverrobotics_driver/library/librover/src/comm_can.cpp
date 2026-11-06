@@ -1,5 +1,8 @@
 #include "comm_can.hpp"
 
+#include <poll.h>
+#include <sys/eventfd.h>
+
 namespace RoverRobotics 
 {
     CommCan::CommCan(const char *device,std::function<void(std::vector<uint8_t>)> parsefunction,std::vector<uint8_t> setting)
@@ -18,10 +21,32 @@ namespace RoverRobotics
         if (bind(fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) 
         {
             std::cerr << "error in socket bind" << std::endl;
+            close(fd);
             throw(-2);
+        }
+        wake_fd_ = eventfd(0, EFD_CLOEXEC);
+        if (wake_fd_ < 0)
+        {
+            std::cerr << "error creating eventfd" << std::endl;
+            close(fd);
+            throw(-1);
         }
         // start read thread
         Can_read_thread_ = std::thread([this, parsefunction]() { this->read_device_loop(parsefunction); });
+    }
+
+    CommCan::~CommCan()
+    {
+        stop_ = true;
+        // An eventfd stays readable once written, so the read thread's poll()
+        // returns whether it is already waiting or only about to wait.
+        uint64_t one = 1;
+        ssize_t ignored = write(wake_fd_, &one, sizeof(one));
+        (void)ignored;
+        // After this join the parse callback can no longer run.
+        if (Can_read_thread_.joinable()) Can_read_thread_.join();
+        close(fd);
+        close(wake_fd_);
     }
 
     void CommCan::write_to_device(std::vector<uint8_t> msg) 
@@ -45,8 +70,20 @@ namespace RoverRobotics
     {
         std::chrono::milliseconds time_last = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
         
-        while (true) 
+        while (!stop_)
         {
+            // Block until the socket is readable or the destructor signals
+            // wake_fd_; a bare blocking read() could not be interrupted.
+            struct pollfd fds[2] = {{fd, POLLIN, 0}, {wake_fd_, POLLIN, 0}};
+            int ready = poll(fds, 2, -1);
+            if (ready < 0)
+            {
+                if (errno == EINTR) continue;
+                std::cerr << "CAN poll failed: " << strerror(errno) << std::endl;
+                is_connected_ = false;
+                return;
+            }
+            if (fds[1].revents != 0 || stop_) return;
             int num_bytes = read(fd, &robot_frame, sizeof(robot_frame));
             std::chrono::milliseconds time_now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
             

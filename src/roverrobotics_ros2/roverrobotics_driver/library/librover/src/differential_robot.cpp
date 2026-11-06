@@ -72,6 +72,15 @@ DifferentialRobot::DifferentialRobot(const char *device,
       std::thread([this]() { this->motors_control_loop(30); });
 }
 
+DifferentialRobot::~DifferentialRobot() {
+  stop_.request();
+  join_if_joinable(motor_speed_update_thread_);
+  join_if_joinable(write_to_robot_thread_);
+  // Explicitly, before the members its read thread's callback uses are
+  // destroyed (they are declared after comm_base_).
+  comm_base_.reset();
+}
+
 void DifferentialRobot::send_estop(bool estop) {
   robotstatus_mutex_.lock();
   estop_ = estop;
@@ -381,7 +390,7 @@ void DifferentialRobot::register_comm_base(const char *device) {
 }
 
 void DifferentialRobot::send_command(int sleeptime) {
-  while (true) {
+  while (!stop_.requested()) {
     if (comm_type_ == "SERIAL") {
       unsigned char *payloadptr;
       uint16_t crc;
@@ -479,7 +488,7 @@ void DifferentialRobot::send_command(int sleeptime) {
     }
     
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(sleeptime));
+    if (stop_.wait_for(sleeptime)) break;
   }
 }
 
@@ -526,7 +535,7 @@ void DifferentialRobot::motors_control_loop(int sleeptime) {
           std::chrono::system_clock::now().time_since_epoch());
   std::chrono::milliseconds time_from_msg;
 
-  while (true) {
+  while (!stop_.requested()) {
     std::chrono::milliseconds time_now =
         std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::system_clock::now().time_since_epoch());
@@ -591,7 +600,7 @@ void DifferentialRobot::motors_control_loop(int sleeptime) {
       if(comm_type_ == "SERIAL")
         send_motors_commands();
     }
-    std::this_thread::sleep_for(std::chrono::milliseconds(sleeptime));
+    if (stop_.wait_for(sleeptime)) break;
   }
 }
 

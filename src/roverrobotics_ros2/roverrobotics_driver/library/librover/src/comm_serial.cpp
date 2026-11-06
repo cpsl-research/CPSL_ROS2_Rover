@@ -1,6 +1,9 @@
 
 #include "comm_serial.hpp"
 
+#include <poll.h>
+#include <sys/eventfd.h>
+
 namespace RoverRobotics {
 CommSerial::CommSerial(const char *device,
                        std::function<void(std::vector<uint8_t>)> parsefunction,
@@ -11,6 +14,7 @@ CommSerial::CommSerial(const char *device,
   struct termios tty;
   if (tcgetattr(serial_port_, &tty) != 0) {
     std::cerr << "error";
+    if (serial_port_ >= 0) close(serial_port_);
     throw(-1);
     return;
   }
@@ -50,12 +54,35 @@ CommSerial::CommSerial(const char *device,
   // Save tty settings, also checking for error
   if (tcsetattr(serial_port_, TCSANOW, &tty) != 0) {
     std::cerr << "error saving tty settings";
+    close(serial_port_);
     throw(-1);
     return;
+  }
+  wake_fd_ = eventfd(0, EFD_CLOEXEC);
+  if (wake_fd_ < 0) {
+    std::cerr << "error creating eventfd";
+    close(serial_port_);
+    throw(-1);
   }
   is_connected_ = false;
   serial_read_thread_ = std::thread(
       [this, parsefunction]() { this->read_device_loop(parsefunction); });
+}
+
+CommSerial::~CommSerial() {
+  stop_ = true;
+  // An eventfd stays readable once written, so the read thread's poll()
+  // returns whether it is already waiting or only about to wait.
+  uint64_t one = 1;
+  ssize_t ignored = write(wake_fd_, &one, sizeof(one));
+  (void)ignored;
+  // After this join the parse callback can no longer run.
+  if (serial_read_thread_.joinable()) serial_read_thread_.join();
+  // Let any final command the owner wrote (e.g. motors neutral) leave the
+  // UART before the port is closed.
+  tcdrain(serial_port_);
+  close(serial_port_);
+  close(wake_fd_);
 }
 
 void CommSerial::write_to_device(std::vector<uint8_t> msg) {
@@ -75,7 +102,19 @@ void CommSerial::read_device_loop(
   std::chrono::milliseconds time_last =
       std::chrono::duration_cast<std::chrono::milliseconds>(
           std::chrono::system_clock::now().time_since_epoch());
-  while (true) {
+  while (!stop_) {
+    // Block until the port has data (or an error/hangup to report via read)
+    // or the destructor signals wake_fd_. A bare blocking read() could not be
+    // interrupted once the robot stops replying.
+    struct pollfd fds[2] = {{serial_port_, POLLIN, 0}, {wake_fd_, POLLIN, 0}};
+    int ready = poll(fds, 2, -1);
+    if (ready < 0) {
+      if (errno == EINTR) continue;
+      std::cerr << "serial poll failed: " << strerror(errno) << std::endl;
+      is_connected_ = false;
+      return;
+    }
+    if (fds[1].revents != 0 || stop_) return;
     uint8_t read_buf[read_size_];
     int num_bytes = read(serial_port_, &read_buf, read_size_);
     std::chrono::milliseconds time_now =

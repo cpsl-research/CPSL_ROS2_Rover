@@ -31,6 +31,11 @@ enum uart_param
 class RoverRobotics::DifferentialRobot
     : public RoverRobotics::BaseProtocolObject {
  public:
+  /*
+   * @brief Stop and join the worker threads, then destroy the comm link
+   * (which joins its read thread) while the members they use still exist.
+   */
+  ~DifferentialRobot() override;
   DifferentialRobot(const char *device,
                      std::string new_comm, 
                      float wheel_radius,
@@ -155,6 +160,7 @@ class RoverRobotics::DifferentialRobot
 
   std::thread write_to_robot_thread_;
   std::thread motor_speed_update_thread_;
+  StopSignal stop_;
   std::mutex robotstatus_mutex_;
 
   /* main data structure */

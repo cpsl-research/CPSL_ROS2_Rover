@@ -85,6 +85,16 @@ Zero2ProtocolObject::Zero2ProtocolObject(
   std::cerr << "protocol is running..." << std::endl;
 }
 
+Zero2ProtocolObject::~Zero2ProtocolObject() {
+  stop_.request();
+  join_if_joinable(motor_speed_update_thread_);
+  join_if_joinable(write_to_robot_thread_);
+  join_if_joinable(slow_data_write_thread_);
+  // Explicitly, before the members its read thread's callback uses are
+  // destroyed (they are declared after comm_base_).
+  comm_base_.reset();
+}
+
 void Zero2ProtocolObject::load_persistent_params() {
   /* trim (aka curvature correction) */
   if (auto param = persistent_params_->read_param("trim")) {
@@ -141,7 +151,7 @@ void Zero2ProtocolObject::motors_control_loop(int sleeptime) {
           std::chrono::system_clock::now().time_since_epoch());
   std::chrono::milliseconds time_from_msg;
 
-  while (true) {
+  while (!stop_.requested()) {
     std::chrono::milliseconds time_now =
         std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::system_clock::now().time_since_epoch());
@@ -199,7 +209,7 @@ void Zero2ProtocolObject::motors_control_loop(int sleeptime) {
       robotstatus_mutex_.unlock();
       send_motors_commands();
     }
-    std::this_thread::sleep_for(std::chrono::milliseconds(sleeptime));
+    if (stop_.wait_for(sleeptime)) break;
   }
 }
 void Zero2ProtocolObject::unpack_comm_response(std::vector<uint8_t> robotmsg) {
@@ -444,7 +454,7 @@ void Zero2ProtocolObject::register_comm_base(const char *device) {
 }
 
 void Zero2ProtocolObject::send_getvalues_command(int sleeptime) {
-  while (true) {
+  while (!stop_.requested()) {
     if (comm_type_ == "serial") {
       unsigned char *payloadptr;
       uint16_t crc;
@@ -483,7 +493,7 @@ void Zero2ProtocolObject::send_getvalues_command(int sleeptime) {
     } else {   //! How did you get here?
       return;  // TODO: Return error ?
     }
-    std::this_thread::sleep_for(std::chrono::milliseconds(sleeptime));
+    if (stop_.wait_for(sleeptime)) break;
   }
 }
 

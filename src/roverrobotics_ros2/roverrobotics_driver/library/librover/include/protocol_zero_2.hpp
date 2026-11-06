@@ -51,6 +51,7 @@ private:
   std::thread write_to_robot_thread_;
   std::thread slow_data_write_thread_;
   std::thread motor_speed_update_thread_;
+  StopSignal stop_;
   bool estop_;
   bool closed_loop_;
   // Motor PID variables
@@ -140,6 +141,11 @@ private:
   unsigned short crc16(unsigned char *buf, unsigned int len);
 
 public:
+  /*
+   * @brief Stop and join the worker threads, then destroy the comm link
+   * (which joins its read thread) while the members they use still exist.
+   */
+  ~Zero2ProtocolObject() override;
   Zero2ProtocolObject(const char *device, std::string new_comm_type,
                       Control::robot_motion_mode_t robot_mode,
                       Control::pid_gains pid, Control::angular_scaling_params angular_scale);
