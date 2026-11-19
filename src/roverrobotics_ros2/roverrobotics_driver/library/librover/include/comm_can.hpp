@@ -20,6 +20,11 @@ class RoverRobotics::CommCan : public RoverRobotics::CommBase {
   CommCan(const char *device, std::function<void(std::vector<uint8_t>)>,
           std::vector<uint8_t>);
   /*
+   * @brief Stops the read thread (wakes it out of poll() and joins it, so
+   * the parse callback is never called again), then closes the socket.
+   */
+  ~CommCan() override;
+  /*
    * @brief Write data to Can Device
    * by accepting a vector of unsigned int 32 and convert it to a byte stream
    * @param msg message to convert and write to device
@@ -51,5 +56,7 @@ class RoverRobotics::CommCan : public RoverRobotics::CommBase {
   std::atomic<bool> is_connected_;
   std::mutex Can_write_mutex_;
   std::thread Can_read_thread_;
+  std::atomic<bool> stop_{false};
+  int wake_fd_ = -1;  // eventfd written by the destructor to wake poll()
   const int TIMEOUT_MS_ = 1000;  // 1 sec timeout
 };

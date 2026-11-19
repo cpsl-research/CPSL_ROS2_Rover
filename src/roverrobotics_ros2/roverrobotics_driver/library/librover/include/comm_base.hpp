@@ -31,6 +31,7 @@
 #include "status_data.hpp"
 #include "utils.hpp"
 #include "global_error_constants.hpp"
+#include "stop_signal.hpp"
 
 
 namespace RoverRobotics {
@@ -38,6 +39,13 @@ class CommBase;
 }
 class RoverRobotics::CommBase {
  public:
+  /*
+   * @brief Implementations own a read thread that calls back into their
+   * owner; their destructor must stop and join it before returning, so the
+   * callback is never invoked after the comm object is gone. Virtual so that
+   * deleting through std::unique_ptr<CommBase> runs the derived destructor.
+   */
+  virtual ~CommBase() = default;
   /*
    * @brief Pure Virtual Interface of Write To Communication Device.
    * The implementation of this function should accept a vector of unsigned

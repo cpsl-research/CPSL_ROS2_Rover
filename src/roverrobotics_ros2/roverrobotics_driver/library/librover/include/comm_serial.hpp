@@ -20,6 +20,12 @@ class RoverRobotics::CommSerial : public RoverRobotics::CommBase {
   CommSerial(const char *device, std::function<void(std::vector<uint8_t>)>,
              std::vector<uint8_t>);
   /*
+   * @brief Stops the read thread (wakes it out of poll() and joins it, so
+   * the parse callback is never called again), waits for queued output to be
+   * transmitted, then closes the port.
+   */
+  ~CommSerial() override;
+  /*
    * @brief Write data to Serial Device
    * by accepting a vector of unsigned int 32 and convert it to a byte stream
    * @param msg message to convert and write to device
@@ -45,5 +51,7 @@ class RoverRobotics::CommSerial : public RoverRobotics::CommBase {
   int serial_port_;
   std::atomic<bool> is_connected_;
   std::thread serial_read_thread_;
+  std::atomic<bool> stop_{false};
+  int wake_fd_ = -1;  // eventfd written by the destructor to wake poll()
   const int TIMEOUT_MS_ = 1000; //1 sec timeout
 };

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import rclpy
+from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
 from std_msgs.msg import String
@@ -71,7 +72,15 @@ def open_yaml(file_name):
 def main(args=None):
     rclpy.init(args=args)
     mapper = Mapper('joy')
-    rclpy.spin(mapper)
+    try:
+        rclpy.spin(mapper)
+    except (KeyboardInterrupt, ExternalShutdownException):
+        # SIGINT from ros2 launch (or a shutdown from another context) is the
+        # normal way this node stops: exit 0, not a traceback and -2.
+        pass
+    finally:
+        mapper.destroy_node()
+        rclpy.try_shutdown()
 
 if __name__ == '__main__':
     main()

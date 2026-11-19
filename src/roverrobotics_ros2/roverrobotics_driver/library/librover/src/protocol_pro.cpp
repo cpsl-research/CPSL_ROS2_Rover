@@ -47,6 +47,30 @@ ProProtocolObject::ProProtocolObject(const char *device,
       std::thread([this]() { this->motors_control_loop(30); });
 }
 
+ProProtocolObject::~ProProtocolObject() {
+  // 1. Stop the threads that compute and write motor commands. The control
+  //    loop goes first so it cannot overwrite the neutral speeds set below.
+  stop_.request();
+  join_if_joinable(motor_commands_update_thread_);
+  join_if_joinable(fast_data_write_thread_);
+  join_if_joinable(slow_data_write_thread_);
+  // 2. Motors to neutral: the same value the control loop applies on estop or
+  //    command timeout, written once more while the port is still open.
+  if (comm_base_) {
+    std::lock_guard<std::mutex> lock(robotstatus_mutex_);
+    motors_speeds_[LEFT_MOTOR] = MOTOR_NEUTRAL_;
+    motors_speeds_[RIGHT_MOTOR] = MOTOR_NEUTRAL_;
+    motors_speeds_[FLIPPER_MOTOR] = MOTOR_NEUTRAL_;
+    comm_base_->write_to_device(motor_frame(REG_MOTOR_FB_RPM_LEFT));
+  }
+  // 3. Destroy the serial link now, not as an implicit member: its destructor
+  //    joins the read thread, whose callback (unpack_comm_response) uses
+  //    robotstatus_mutex_ and robotstatus_, declared after comm_base_ and so
+  //    otherwise destroyed before it. Then drains the neutral frame and closes
+  //    the port.
+  comm_base_.reset();
+}
+
 void ProProtocolObject::update_drivetrim(double value) { trimvalue_ += value; }
 
 void ProProtocolObject::send_estop(bool estop) {
@@ -83,8 +107,8 @@ void ProProtocolObject::motors_control_loop(int sleeptime) {
           std::chrono::system_clock::now().time_since_epoch());
   std::chrono::milliseconds time_from_msg;
 
-  while (true) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(sleeptime));
+  while (!stop_.requested()) {
+    if (stop_.wait_for(sleeptime)) break;
     std::chrono::milliseconds time_now =
         std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::system_clock::now().time_since_epoch());
@@ -160,11 +184,12 @@ void ProProtocolObject::unpack_comm_response(std::vector<uint8_t> robotmsg) {
       msgqueue.size() > RECEIVE_MSG_LEN_) {
     int startbyte_index = 0;
     // !Did not find valid start byte in buffer
-    while (msgqueue[startbyte_index] != startbyte_ &&
-           startbyte_index < msgqueue.size())
+    while (startbyte_index < msgqueue.size() &&
+           msgqueue[startbyte_index] != startbyte_)
       startbyte_index++;
     if (startbyte_index >= msgqueue.size()) {
       msgqueue.clear();
+      robotstatus_mutex_.unlock();
       return;
     } else {
       // !Reconstruct the vector so that the start byte is at the 0 position
@@ -389,34 +414,38 @@ void ProProtocolObject::register_comm_base(const char *device) {
 
 void ProProtocolObject::send_command(int sleeptime,
                                      std::vector<uint32_t> datalist) {
-  while (true) {
+  while (!stop_.requested()) {
     for (int x : datalist) {
       if (comm_type_ == "serial") {
         robotstatus_mutex_.lock();
-        std::vector<unsigned char> write_buffer = {
-            (unsigned char)startbyte_,
-            (unsigned char)int(motors_speeds_[LEFT_MOTOR]),
-            (unsigned char)int(motors_speeds_[RIGHT_MOTOR]),
-            (unsigned char)int(motors_speeds_[FLIPPER_MOTOR]),
-            (unsigned char)requestbyte_,
-            (unsigned char)x};
-
-        write_buffer.push_back(
-            (char)255 - ((unsigned char)int(motors_speeds_[LEFT_MOTOR]) +
-                         (unsigned char)int(motors_speeds_[RIGHT_MOTOR]) +
-                         (unsigned char)int(motors_speeds_[FLIPPER_MOTOR]) +
-                         requestbyte_ + x) %
-                            255);
-        comm_base_->write_to_device(write_buffer);
+        comm_base_->write_to_device(motor_frame(x));
         robotstatus_mutex_.unlock();
       } else if (comm_type_ == "can") {
         return;  //* no CAN for rover pro
       } else {   //! How did you get here?
         return;  // TODO: Return error ?
       }
-      std::this_thread::sleep_for(std::chrono::milliseconds(sleeptime));
+      if (stop_.wait_for(sleeptime)) return;
     }
   }
+}
+
+std::vector<unsigned char> ProProtocolObject::motor_frame(int x) {
+  std::vector<unsigned char> write_buffer = {
+      (unsigned char)startbyte_,
+      (unsigned char)int(motors_speeds_[LEFT_MOTOR]),
+      (unsigned char)int(motors_speeds_[RIGHT_MOTOR]),
+      (unsigned char)int(motors_speeds_[FLIPPER_MOTOR]),
+      (unsigned char)requestbyte_,
+      (unsigned char)x};
+
+  write_buffer.push_back(
+      (char)255 - ((unsigned char)int(motors_speeds_[LEFT_MOTOR]) +
+                   (unsigned char)int(motors_speeds_[RIGHT_MOTOR]) +
+                   (unsigned char)int(motors_speeds_[FLIPPER_MOTOR]) +
+                   requestbyte_ + x) %
+                      255);
+  return write_buffer;
 }
 
 }  // namespace RoverRobotics
